@@ -1,0 +1,34 @@
+# Global ignores
+.env
+*.log
+*.tmp
+*.swp
+
+# Go
+/backend/bin/
+/backend/pkg/
+/backend/db/gen/
+/backend/api/gen/
+/backend/.air.toml
+/backend/coverage.out
+
+# Python
+/processing/__pycache__/
+/processing/*.pyc
+/processing/venv/
+/processing/.ipynb_checkpoints/
+
+# C++
+/frontend/build/
+/frontend/bin/
+/frontend/*.o
+
+
+# VSCode / JetBrains
+.vscode/
+.idea/
+
+
+# Docker
+**/pgdata/
+docker-compose.override.yml
