@@ -8,12 +8,9 @@ import (
 
 type Config struct {
 	TOKEN	string
-    // DBHost     string
-    // DBPort     string
-    // DBUser     string
-    // DBPassword string
-    // DBName     string
-    // GRPCPort   string
+    MODULE_NAME  string
+    ENDPOINT string
+
 }
 
 func LoadConfig() Config {
@@ -23,10 +20,8 @@ func LoadConfig() Config {
 
     return Config{
         TOKEN:     os.Getenv("TOKEN"),
-        // DBPort:     os.Getenv("DB_PORT"),
-        // DBUser:     os.Getenv("DB_USER"),
-        // DBPassword: os.Getenv("DB_PASSWORD"),
-        // DBName:     os.Getenv("DB_NAME"),
-        // GRPCPort:   os.Getenv("GRPC_PORT"),
+        MODULE_NAME:    os.Getenv("MODULE_NAME"),
+        ENDPOINT: os.Getenv("ENDPOINT"),
+
     }
 }
