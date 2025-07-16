@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"fmt"
-
 	"github.com/alexxnosk/finproto/backend/config"
 	"github.com/alexxnosk/finproto/backend/trade_api/data"
 )
