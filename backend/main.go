@@ -1,20 +1,19 @@
-package main1
+package main
 
 import (
 	"fmt"
-	//"time"
 
+	"github.com/alexxnosk/finproto/backend/config"
 	"github.com/alexxnosk/finproto/backend/trade_api/data"
-	//"github.com/jackc/pgx/v5"
 )
 
 func main() {
 
-var jsonData = []byte(`{
+	var jsonData = []byte(`{
   "request": {
-    "symbol": "VTBR@MISX",
+    "symbol": "SBER@MISX",
     "timeframe": "D",
-    "start_date": "01-01-2003",
+    "start_date": "01-01-2000",
     "end_date": "nil",
     "operation": "delete"
   },
@@ -31,8 +30,9 @@ var jsonData = []byte(`{
     }
   }
 }`)
-
-	err := data.InstrumentCreate(jsonData)
+	token := config.LoadConfig().TOKEN
+	err := data.AssetCreate(jsonData, token)
+	//_, err := data.AssetsUpload(token)
 	if err != nil {
 		fmt.Println("ERROR:", err)
 	}

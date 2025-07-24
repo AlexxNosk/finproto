@@ -33,6 +33,7 @@ find "$PROTO_DST_DIR" -name "*.proto" | while read -r proto_file; do
     echo "📦 Compiling $proto_file..."
     protoc \
         --proto_path=. \
+        --proto_path=trade_api \
         --proto_path="$GOOGLEAPIS_DIR" \
         --go_out="$OUT_DIR" \
         --go-grpc_out="$OUT_DIR" \

@@ -434,7 +434,7 @@ type GetAssetResponse struct {
 	Name string `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`
 	// Кол-во десятичных знаков в цене
 	Decimals int32 `protobuf:"varint,10,opt,name=decimals,proto3" json:"decimals,omitempty"`
-	// Минимальный шаг цены
+	// Минимальный шаг цены. Для расчета финального ценового шага: min_step/(10ˆdecimals)
 	MinStep int64 `protobuf:"varint,11,opt,name=min_step,json=minStep,proto3" json:"min_step,omitempty"`
 	// Кол-во штук в лоте
 	LotSize *decimal.Decimal `protobuf:"bytes,9,opt,name=lot_size,json=lotSize,proto3" json:"lot_size,omitempty"`
@@ -773,7 +773,7 @@ func (x *OptionsChainRequest) GetUnderlyingSymbol() string {
 // Информация о цепочке опционов
 type OptionsChainResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Символ опциона
+	// Символ базового актива опциона
 	Symbol string `protobuf:"bytes,1,opt,name=symbol,proto3" json:"symbol,omitempty"`
 	// Информация об опционе
 	Options       []*Option `protobuf:"bytes,2,rep,name=options,proto3" json:"options,omitempty"`

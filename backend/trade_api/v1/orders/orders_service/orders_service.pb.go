@@ -99,19 +99,19 @@ const (
 	TimeInForce_TIME_IN_FORCE_UNSPECIFIED TimeInForce = 0
 	// До конца дня
 	TimeInForce_TIME_IN_FORCE_DAY TimeInForce = 1
-	// Good till cancel
+	// Действителен до отмены
 	TimeInForce_TIME_IN_FORCE_GOOD_TILL_CANCEL TimeInForce = 2
-	// Good till crossing
+	// Действителен до пересечения
 	TimeInForce_TIME_IN_FORCE_GOOD_TILL_CROSSING TimeInForce = 3
-	// Extended hours
+	// Внебиржевая торговля
 	TimeInForce_TIME_IN_FORCE_EXT TimeInForce = 4
 	// На открытии биржи
 	TimeInForce_TIME_IN_FORCE_ON_OPEN TimeInForce = 5
 	// На закрытии биржи
 	TimeInForce_TIME_IN_FORCE_ON_CLOSE TimeInForce = 6
-	// Immediate or Cancel
+	// Исполнить немедленно или отменить
 	TimeInForce_TIME_IN_FORCE_IOC TimeInForce = 7
-	// Fill or Kill
+	// Исполнить полностью или отменить
 	TimeInForce_TIME_IN_FORCE_FOK TimeInForce = 8
 )
 
@@ -227,61 +227,61 @@ type OrderStatus int32
 const (
 	// Неопределенное значение
 	OrderStatus_ORDER_STATUS_UNSPECIFIED OrderStatus = 0
-	// NEW
+	// Новая заявка
 	OrderStatus_ORDER_STATUS_NEW OrderStatus = 1
-	// PARTIALLY_FILLED
+	// Частично исполненная
 	OrderStatus_ORDER_STATUS_PARTIALLY_FILLED OrderStatus = 2
-	// FILLED
+	// Исполненная
 	OrderStatus_ORDER_STATUS_FILLED OrderStatus = 3
-	// DONE_FOR_DAY
+	// Действует в течение дня
 	OrderStatus_ORDER_STATUS_DONE_FOR_DAY OrderStatus = 4
-	// CANCELED
+	// Отменена
 	OrderStatus_ORDER_STATUS_CANCELED OrderStatus = 5
-	// REPLACED
+	// Заменена на другую
 	OrderStatus_ORDER_STATUS_REPLACED OrderStatus = 6
-	// PENDING_CANCEL
+	// Ожидает отмены
 	OrderStatus_ORDER_STATUS_PENDING_CANCEL OrderStatus = 7
-	// REJECTED
+	// Отклонена
 	OrderStatus_ORDER_STATUS_REJECTED OrderStatus = 9
-	// SUSPENDED
+	// Приостановлена
 	OrderStatus_ORDER_STATUS_SUSPENDED OrderStatus = 10
-	// PENDING_NEW
+	// В ожидании новой
 	OrderStatus_ORDER_STATUS_PENDING_NEW OrderStatus = 11
-	// EXPIRED
+	// Истекла
 	OrderStatus_ORDER_STATUS_EXPIRED OrderStatus = 13
-	// FAILED
+	// Ошибка
 	OrderStatus_ORDER_STATUS_FAILED OrderStatus = 16
-	// FORWARDING
+	// Пересылка
 	OrderStatus_ORDER_STATUS_FORWARDING OrderStatus = 17
-	// WAIT
+	// Ожидает
 	OrderStatus_ORDER_STATUS_WAIT OrderStatus = 18
-	// DENIED_BY_BROKER
+	// Отклонено брокером
 	OrderStatus_ORDER_STATUS_DENIED_BY_BROKER OrderStatus = 19
-	// REJECTED_BY_EXCHANGE
+	// Отклонено биржей
 	OrderStatus_ORDER_STATUS_REJECTED_BY_EXCHANGE OrderStatus = 20
-	// WATCHING
+	// Наблюдение
 	OrderStatus_ORDER_STATUS_WATCHING OrderStatus = 21
-	// EXECUTED
+	// Исполнена
 	OrderStatus_ORDER_STATUS_EXECUTED OrderStatus = 22
-	// DISABLED
+	// Отключена
 	OrderStatus_ORDER_STATUS_DISABLED OrderStatus = 23
-	// LINK_WAIT
+	// Ожидание ссылки
 	OrderStatus_ORDER_STATUS_LINK_WAIT OrderStatus = 24
-	// SL_GUARD_TIME
+	// Защитное время SL
 	OrderStatus_ORDER_STATUS_SL_GUARD_TIME OrderStatus = 27
-	// SL_EXECUTED
+	// Исполнена по SL
 	OrderStatus_ORDER_STATUS_SL_EXECUTED OrderStatus = 28
-	// SL_FORWARDING
+	// Пересылка SL
 	OrderStatus_ORDER_STATUS_SL_FORWARDING OrderStatus = 29
-	// TP_GUARD_TIME
+	// Защитное время TP
 	OrderStatus_ORDER_STATUS_TP_GUARD_TIME OrderStatus = 30
-	// TP_EXECUTED
+	// Исполнена по TP
 	OrderStatus_ORDER_STATUS_TP_EXECUTED OrderStatus = 31
-	// TP_CORRECTION
+	// Коррекция TP
 	OrderStatus_ORDER_STATUS_TP_CORRECTION OrderStatus = 32
-	// TP_FORWARDING
+	// Пересылка TP
 	OrderStatus_ORDER_STATUS_TP_FORWARDING OrderStatus = 33
-	// TP_CORR_GUARD_TIME
+	// Коррекция TP в защитное время
 	OrderStatus_ORDER_STATUS_TP_CORR_GUARD_TIME OrderStatus = 34
 )
 

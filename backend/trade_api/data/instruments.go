@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/alexxnosk/finproto/backend/config"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,14 +14,14 @@ import (
 func tableName(symbol, tfStr, name string) string {
 	s := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(symbol, "@", "_"), "-", "_"))
 	t := strings.ToLower(tfStr)
-	if n := strings.ToLower(name); n !=""{
+	if n := strings.ToLower(name); n != "" {
 		return fmt.Sprintf("bars_%s_%s_%s", s, t, n)
 	}
 	return fmt.Sprintf("bars_%s_%s", s, t)
 }
 
 type InstrumentRequest struct {
-	Request RequestParameters         `json:"request"`
+	Request RequestParameters            `json:"request"`
 	Tables  map[string]map[string]string `json:"tables"` // table name → column name → type
 }
 
@@ -34,47 +33,40 @@ type RequestParameters struct {
 	Operation string `json:"operation"` // "create", "update", "delete"
 }
 
-func InstrumentCreate(jsonData []byte) error {
+func AssetCreate(jsonData []byte, token string) error {
 	var req InstrumentRequest
 	if err := json.Unmarshal(jsonData, &req); err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)
 	}
 
 	ctx := context.Background()
-	connStr := "postgres://root:root@localhost:5434/finProto_db"
-	conn, err := pgx.Connect(ctx, connStr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-
-	switch strings.ToLower(req.Request.Operation) {
-	case "delete":
-		return DynamicTableDelete(ctx, conn, req)
-	default:
-		if strings.ToLower(req.Request.Operation) == "update" {
-			numb, err := AssetsUpload()
-            if  err != nil {                
-                return err
-            }
-			fmt.Printf("Update available instruments: %v", numb)
-        }
-		if err := DynamicTable(ctx, conn, req.Request.Symbol, req.Request.Timeframe); err != nil {
-			return err
-		}
-
-		if err := DynamicDataTables(ctx, conn, req); err != nil {
-			return err
-			}
-		
-	}
-
-	client, err := NewClient(ctx, config.LoadConfig().TOKEN)
+	client, err := NewClient(ctx, token)
 	if err != nil {
 		slog.Error("NewClient", "err", err.Error())
 		return err
 	}
-	defer client.Close()
+	defer client.Close(ctx)
+
+	switch strings.ToLower(req.Request.Operation) {
+	case "delete":
+		return DynamicTableDelete(ctx, client.connPG, req)
+	default:
+		if strings.ToLower(req.Request.Operation) == "update" {
+			_, numb, err := AssetsTable("update", token)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Update available instruments: %v", numb)
+		}
+		if err := DynamicTable(ctx, client.connPG, req.Request.Symbol, req.Request.Timeframe); err != nil {
+			return err
+		}
+
+		if err := DynamicDataTables(ctx, client.connPG, req); err != nil {
+			return err
+		}
+
+	}
 
 	bars, _, err := BarsGRPC(ctx, client, req.Request.Symbol, req.Request.Timeframe, req.Request.StartDate, req.Request.EndDate)
 	if err != nil {
@@ -87,29 +79,23 @@ func InstrumentCreate(jsonData []byte) error {
 		if err != nil {
 			return err
 		}
-		if err := InsertDataInTables(ctx, conn, barPgUpdate, req); err != nil {
+		if err := InsertDataInTables(ctx, client.connPG, barPgUpdate, req); err != nil {
 			return fmt.Errorf("insert data failed: %w", err)
 		}
 	}
-	
-		if err := InsertInfoInTables(ctx, conn, req); err != nil {
-			return fmt.Errorf("insertion info in tables failed: %w", err)
-		}
 
-
-
-
-
+	if err := InsertInfoInTables(ctx, client.connPG, req); err != nil {
+		return fmt.Errorf("insertion info in tables failed: %w", err)
+	}
 
 	return nil
 }
 
-
 func DynamicDataTables(ctx context.Context, conn *pgx.Conn, req InstrumentRequest) error {
 	tx, err := conn.Begin(ctx)
-		if err != nil {
-			return fmt.Errorf("begin tx: %w", err)
-		}
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
 	defer tx.Rollback(ctx)
 
 	var instrumentID int
@@ -150,7 +136,7 @@ func DynamicDataTables(ctx context.Context, conn *pgx.Conn, req InstrumentReques
 			return fmt.Errorf("create table %s: %w", newTableName, err)
 		}
 
-	fmt.Println("Created new data table:", newTableName)
+		fmt.Println("Created new data table:", newTableName)
 	}
 	return tx.Commit(ctx)
 }
@@ -169,11 +155,6 @@ func mapJSONTypeToPostgres(jsonType string) string {
 		return ""
 	}
 }
-
-
-
-
-
 
 // Creates instrument_tables entry + dynamic table, wrapped in a transaction
 func DynamicTable(ctx context.Context, conn *pgx.Conn, symbol, tfStr string) error {
@@ -247,11 +228,11 @@ func DynamicTableDelete(ctx context.Context, conn *pgx.Conn, req InstrumentReque
 		return fmt.Errorf("get timeframe_id: %w", err)
 	}
 
-    // Delete data_tables
+	// Delete data_tables
 	rows, err := tx.Query(ctx, `
 	SELECT table_name FROM data_tables
 	WHERE instrument_id = $1 AND timeframe_id = $2`,
-	instrumentID, timeframeID)
+		instrumentID, timeframeID)
 	if err != nil {
 		return fmt.Errorf("query data_tables: %w", err)
 	}
@@ -273,7 +254,7 @@ func DynamicTableDelete(ctx context.Context, conn *pgx.Conn, req InstrumentReque
 
 	for _, dataTable := range tablesToDrop {
 		dropSQL := fmt.Sprintf(`DROP TABLE IF EXISTS "%s" CASCADE`, dataTable)
-		
+
 		if _, err := tx.Exec(ctx, dropSQL); err != nil {
 			return fmt.Errorf("drop data_table %s: %w", dataTable, err)
 		}
@@ -361,11 +342,11 @@ func InsertDataInTables(ctx context.Context, conn *pgx.Conn, arg BarPgUpdate, re
 			return fmt.Errorf("insert data table: %w", err)
 		}
 	}
-	
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
-return nil
+	return nil
 }
 
 func InsertInfoInTables(ctx context.Context, conn *pgx.Conn, req InstrumentRequest) error {
@@ -410,9 +391,9 @@ func InsertInfoInTables(ctx context.Context, conn *pgx.Conn, req InstrumentReque
 
 		fmt.Println("inserted data table:", newTableName)
 	}
-	
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
-return nil
+	return nil
 }

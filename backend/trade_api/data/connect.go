@@ -2,8 +2,8 @@ package data
 
 import (
 	"context"
-	"fmt"
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -13,6 +13,7 @@ import (
 	"github.com/alexxnosk/finproto/backend/trade_api/v1/auth/auth_service"
 	"github.com/alexxnosk/finproto/backend/trade_api/v1/marketdata/marketdata_service"
 	"github.com/alexxnosk/finproto/backend/trade_api/v1/orders/orders_service"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
@@ -21,6 +22,7 @@ import (
 
 const (
 	endPoint = "api.finam.ru:443" //"ftrr01.finam.ru:443"
+	connPgStr = "postgres://root:root@localhost:5434/finProto_db"
 )
 
 var logLevel = &slog.LevelVar{} // INFO
@@ -41,8 +43,7 @@ func SetLogDebug(debug bool) {
 	}
 }
 
-
-type Security struct {
+type Asset struct {
 	Ticker string `json:"ticker,omitempty"` // Тикер инструмента
 	Symbol string `json:"symbol,omitempty"` // Символ инструмента ticker@mic
 	Name   string `json:"name,omitempty"`   // Наименование инструмента
@@ -56,12 +57,13 @@ type Client struct {
 	accessToken       string    // JWT токен для дальнейшей авторизации
 	ttlJWT            time.Time // Время завершения действия JWT токена
 	conn              *grpc.ClientConn
+	connPG			  *pgx.Conn
 	AuthService       auth_service.AuthServiceClient
 	AccountsService   accounts_service.AccountsServiceClient
 	AssetsService     assets_service.AssetsServiceClient
 	MarketDataService marketdata_service.MarketDataServiceClient
 	OrdersService     orders_service.OrdersServiceClient
-	Securities        map[string]Security //  Список инструментов с которыми работаем (или весь список? )
+	Securities        map[string]Asset //  Список инструментов с которыми работаем (или весь список? )
 }
 
 func NewClient(ctx context.Context, token string) (*Client, error) {
@@ -78,15 +80,20 @@ func NewClient(ctx context.Context, token string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	connPG, err:= ConnPG(ctx, connPgStr)
+	if err != nil {
+		return nil, err
+	}
 	client := &Client{
 		token:             token,
 		conn:              conn,
+		connPG: 		   connPG,
 		AuthService:       auth_service.NewAuthServiceClient(conn),
 		AccountsService:   accounts_service.NewAccountsServiceClient(conn),
 		AssetsService:     assets_service.NewAssetsServiceClient(conn),
 		MarketDataService: marketdata_service.NewMarketDataServiceClient(conn),
 		OrdersService:     orders_service.NewOrdersServiceClient(conn),
-		Securities:        make(map[string]Security),
+		Securities:        make(map[string]Asset),
 	}
 	log.Debug("NewClient есть connect")
 	err = client.UpdateJWT(ctx) // сразу получим и запишем accessToken для работы
@@ -98,10 +105,32 @@ func NewClient(ctx context.Context, token string) (*Client, error) {
 	return client, nil
 }
 
-func (c *Client) Close() error {
-	return c.conn.Close()
+func (c *Client) Close(ctx context.Context) error {
+	err := c.connPG.Close(ctx)
+	if err !=nil{
+		return err
+	}
+	err = c.conn.Close()
+	if err !=nil{
+		return err
+	}
+	return nil
 
 }
+
+func ConnPG (ctx context.Context, connPgStr string) (*pgx.Conn, error){
+	connPG, err := pgx.Connect(ctx, connPgStr)
+	if err != nil {
+		slog.Error("pgx.Connect", "err", err.Error())
+		return nil, err
+	}
+    return connPG, err
+}
+
+
+
+
+
 
 
 const authKey = "Authorization"             //
@@ -204,4 +233,3 @@ func (c *Client) WithAuthToken(ctx context.Context) (context.Context, error) {
 	// и добавляем его в ctx
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
-

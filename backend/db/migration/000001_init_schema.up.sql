@@ -22,49 +22,49 @@ INSERT INTO timeframes (id, code, description) VALUES
 (22, 'QR',          'Quarter')
 ON CONFLICT (id) DO NOTHING;
 
--- Instruments table
-CREATE TABLE IF NOT EXISTS instruments (
+-- assets table
+CREATE TABLE IF NOT EXISTS assets (
     id           SERIAL PRIMARY KEY,
     ticker       VARCHAR NOT NULL,
     symbol       VARCHAR NOT NULL UNIQUE,        -- e.g., "GAZP@MISX"
     name         VARCHAR,
     mic          VARCHAR NOT NULL,               -- Exchange code
-    type         VARCHAR NOT NULL,               -- Instrument type
+    type         VARCHAR NOT NULL,               -- asset type
     external_id  VARCHAR NOT NULL UNIQUE,        -- Original ID from external source
     updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
--- Track per-instrument+timeframe table creation
-CREATE TABLE IF NOT EXISTS instrument_tables (
+-- Track per-asset+timeframe table creation
+CREATE TABLE IF NOT EXISTS asset_tables (
     id             SERIAL PRIMARY KEY,
-    instrument_id  INT NOT NULL REFERENCES instruments(id) ON DELETE CASCADE,
+    asset_id  INT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     timeframe_id   INT NOT NULL REFERENCES timeframes(id),
     table_name     TEXT NOT NULL UNIQUE,
     created_at     TIMESTAMPTZ DEFAULT now(),
     updated_at     TIMESTAMPTZ DEFAULT now(),
 
-    UNIQUE (instrument_id, timeframe_id)
+    UNIQUE (asset_id, timeframe_id)
 );
 
--- Track per-instrument+timeframe data tables creation
+-- Track per-asset+timeframe data tables creation
 CREATE TABLE IF NOT EXISTS data_tables (
     id                      SERIAL PRIMARY KEY,
-    instrument_id           INT NOT NULL REFERENCES instruments(id) ON DELETE CASCADE,
+    asset_id           INT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     timeframe_id            INT NOT NULL REFERENCES timeframes(id),
-    instrument_table_id     INT NOT NULL REFERENCES instrument_tables(id),
+    asset_table_id     INT NOT NULL REFERENCES asset_tables(id),
     table_name              TEXT NOT NULL UNIQUE,
     purpose                 TEXT,                  -- e.g. 'news', 'fundamentals', etc.
     created_at              TIMESTAMPTZ DEFAULT now(),
     updated_at              TIMESTAMPTZ DEFAULT now(),
 
-    UNIQUE (instrument_id, timeframe_id, table_name)
+    UNIQUE (asset_id, timeframe_id, table_name)
 );
 
 
 -- Historical bars table
 -- CREATE TABLE bars (
 --     id            SERIAL PRIMARY KEY,
-    -- instrument_id INT NOT NULL REFERENCES instruments(id) ON DELETE CASCADE,
+    -- asset_id INT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     -- timeframe_id  INT NOT NULL REFERENCES timeframes(id),
     -- timestamp     TIMESTAMPTZ NOT NULL,            
     -- open          DOUBLE PRECISION,                -- Nullable
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS data_tables (
     -- volume        BIGINT --,
     -- created_at    TIMESTAMPTZ DEFAULT now(),
     -- updated_at    TIMESTAMPTZ,
-    -- UNIQUE (instrument_id, timeframe_id, timestamp)
+    -- UNIQUE (asset_id, timeframe_id, timestamp)
 -- );
 
 

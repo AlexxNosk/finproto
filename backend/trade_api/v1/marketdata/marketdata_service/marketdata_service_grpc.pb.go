@@ -34,7 +34,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Сервис рыночных данных
-
 type MarketDataServiceClient interface {
 	// Получение исторических данных по инструменту (агрегированные свечи)
 	// Пример HTTP запроса:

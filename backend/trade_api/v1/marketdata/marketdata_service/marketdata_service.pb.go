@@ -1605,7 +1605,7 @@ type Quote_Option struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Открытый интерес
 	OpenInterest *decimal.Decimal `protobuf:"bytes,1,opt,name=open_interest,json=openInterest,proto3" json:"open_interest,omitempty"`
-	// Implied volatility
+	// Подразумеваемая волатильность
 	ImpliedVolatility *decimal.Decimal `protobuf:"bytes,2,opt,name=implied_volatility,json=impliedVolatility,proto3" json:"implied_volatility,omitempty"`
 	// Теоретическая цена
 	TheoreticalPrice *decimal.Decimal `protobuf:"bytes,3,opt,name=theoretical_price,json=theoreticalPrice,proto3" json:"theoretical_price,omitempty"`
