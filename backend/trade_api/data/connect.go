@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	endPoint = "api.finam.ru:443" //"ftrr01.finam.ru:443"
+	endPoint  = "api.finam.ru:443" //"ftrr01.finam.ru:443"
 	connPgStr = "postgres://root:root@localhost:5434/finProto_db"
 )
 
@@ -43,13 +43,23 @@ func SetLogDebug(debug bool) {
 	}
 }
 
-type Asset struct {
+type AssetFinam struct {
 	Ticker string `json:"ticker,omitempty"` // Тикер инструмента
 	Symbol string `json:"symbol,omitempty"` // Символ инструмента ticker@mic
 	Name   string `json:"name,omitempty"`   // Наименование инструмента
 	Mic    string `json:"mic,omitempty"`    // Идентификатор биржи
 	Type   string `json:"type,omitempty"`   // Тип инструмента
-	Id     string `json:"id,omitempty"`     // Идентификатор инструмента
+	ID     string `json:"id,omitempty"`     // Идентификатор инструмента
+}
+
+type AssetFinamPG struct {
+	ID      int    `json:"id,omitempty"`
+	Ticker  string `json:"ticker,omitempty"`
+	Symbol  string `json:"symbol,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Mic     string `json:"mic,omitempty"`
+	Type    string `json:"type,omitempty"`
+	FinamID string `json:"finam_id,omitempty"`
 }
 
 type Client struct {
@@ -57,13 +67,13 @@ type Client struct {
 	accessToken       string    // JWT токен для дальнейшей авторизации
 	ttlJWT            time.Time // Время завершения действия JWT токена
 	conn              *grpc.ClientConn
-	connPG			  *pgx.Conn
+	connPG            *pgx.Conn
 	AuthService       auth_service.AuthServiceClient
 	AccountsService   accounts_service.AccountsServiceClient
 	AssetsService     assets_service.AssetsServiceClient
 	MarketDataService marketdata_service.MarketDataServiceClient
 	OrdersService     orders_service.OrdersServiceClient
-	Securities        map[string]Asset //  Список инструментов с которыми работаем (или весь список? )
+	Securities        map[string]AssetFinam //  Список инструментов с которыми работаем (или весь список? )
 }
 
 func NewClient(ctx context.Context, token string) (*Client, error) {
@@ -80,20 +90,20 @@ func NewClient(ctx context.Context, token string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	connPG, err:= ConnPG(ctx, connPgStr)
+	connPG, err := ConnPG(ctx, connPgStr)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{
 		token:             token,
 		conn:              conn,
-		connPG: 		   connPG,
+		connPG:            connPG,
 		AuthService:       auth_service.NewAuthServiceClient(conn),
 		AccountsService:   accounts_service.NewAccountsServiceClient(conn),
 		AssetsService:     assets_service.NewAssetsServiceClient(conn),
 		MarketDataService: marketdata_service.NewMarketDataServiceClient(conn),
 		OrdersService:     orders_service.NewOrdersServiceClient(conn),
-		Securities:        make(map[string]Asset),
+		Securities:        make(map[string]AssetFinam),
 	}
 	log.Debug("NewClient есть connect")
 	err = client.UpdateJWT(ctx) // сразу получим и запишем accessToken для работы
@@ -107,31 +117,25 @@ func NewClient(ctx context.Context, token string) (*Client, error) {
 
 func (c *Client) Close(ctx context.Context) error {
 	err := c.connPG.Close(ctx)
-	if err !=nil{
+	if err != nil {
 		return err
 	}
 	err = c.conn.Close()
-	if err !=nil{
+	if err != nil {
 		return err
 	}
 	return nil
 
 }
 
-func ConnPG (ctx context.Context, connPgStr string) (*pgx.Conn, error){
+func ConnPG(ctx context.Context, connPgStr string) (*pgx.Conn, error) {
 	connPG, err := pgx.Connect(ctx, connPgStr)
 	if err != nil {
 		slog.Error("pgx.Connect", "err", err.Error())
 		return nil, err
 	}
-    return connPG, err
+	return connPG, err
 }
-
-
-
-
-
-
 
 const authKey = "Authorization"             //
 const jwtTokenTtl = 12 * time.Minute        // Время жизни токена JWT в минутах (15 минут)

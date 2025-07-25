@@ -23,7 +23,7 @@ INSERT INTO timeframes (id, code, description) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- assets table
-CREATE TABLE IF NOT EXISTS assets (
+CREATE TABLE IF NOT EXISTS finam_assets (
     id           SERIAL PRIMARY KEY,
     ticker       VARCHAR NOT NULL,
     symbol       VARCHAR NOT NULL UNIQUE,        -- e.g., "GAZP@MISX"
@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS asset_tables (
     table_name     TEXT NOT NULL UNIQUE,
     created_at     TIMESTAMPTZ DEFAULT now(),
     updated_at     TIMESTAMPTZ DEFAULT now(),
-
     UNIQUE (asset_id, timeframe_id)
 );
 
@@ -53,7 +52,7 @@ CREATE TABLE IF NOT EXISTS data_tables (
     timeframe_id            INT NOT NULL REFERENCES timeframes(id),
     asset_table_id     INT NOT NULL REFERENCES asset_tables(id),
     table_name              TEXT NOT NULL UNIQUE,
-    purpose                 TEXT,                  -- e.g. 'news', 'fundamentals', etc.
+    purpose                 TEXT,                  
     created_at              TIMESTAMPTZ DEFAULT now(),
     updated_at              TIMESTAMPTZ DEFAULT now(),
 

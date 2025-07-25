@@ -19,9 +19,9 @@
 /processing/.ipynb_checkpoints/
 
 # C++
-/frontend/build/
-/frontend/bin/
-/frontend/*.o
+/charts/build/
+/charts/bin/
+/charts/*.o
 
 
 # VSCode / JetBrains

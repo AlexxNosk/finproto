@@ -9,10 +9,9 @@ import (
 	"github.com/alexxnosk/finproto/backend/trade_api/v1/marketdata/marketdata_service"
 	"google.golang.org/genproto/googleapis/type/interval"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
 )
 
-func BarsGRPC(ctx context.Context, client *Client, symbol, tfStr, startStr, endStr string) ([]*BarDecimal, *string, error) {
+func BarsFromFinam(ctx context.Context, client *Client, symbol, tfStr, startStr, endStr string) ([]*BarDecimal, *string, error) {
 	var barDecimal []*BarDecimal
 
 	if symbol == "" || tfStr == "" {

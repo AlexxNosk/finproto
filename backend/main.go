@@ -9,30 +9,40 @@ import (
 
 func main() {
 
+// 	var jsonData = []byte(`{
+//   "request": {
+//     "symbol": "SBER@MISX",
+//     "timeframe": "D",
+//     "start_date": "01-01-2000",
+//     "end_date": "nil",
+//     "operation": "delete"
+//   },
+//   "tables": {
+//     "fundamentals": {
+//       "eps": "float64",
+//       "dividends": "float64",
+//       "currency": "string"
+//     },
+//     "news": {
+//       "headline": "string",
+//       "date": "string",
+//       "impact": "int64"
+//     }
+//   }
+// }`)
+
+
 	var jsonData = []byte(`{
-  "request": {
     "symbol": "SBER@MISX",
-    "timeframe": "D",
+    "timeframe": "H1",
     "start_date": "01-01-2000",
     "end_date": "nil",
-    "operation": "delete"
-  },
-  "tables": {
-    "fundamentals": {
-      "eps": "float64",
-      "dividends": "float64",
-      "currency": "string"
-    },
-    "news": {
-      "headline": "string",
-      "date": "string",
-      "impact": "int64"
-    }
-  }
+    "operation": "delet"
 }`)
+
 	token := config.LoadConfig().TOKEN
 	err := data.AssetCreate(jsonData, token)
-	//_, err := data.AssetsUpload(token)
+	//_, _, err := data.FinamAssetsTable("create", token) 
 	if err != nil {
 		fmt.Println("ERROR:", err)
 	}
