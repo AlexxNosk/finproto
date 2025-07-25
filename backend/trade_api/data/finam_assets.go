@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,6 +10,24 @@ import (
 	"github.com/alexxnosk/finproto/backend/trade_api/v1/assets/assets_service"
 	"github.com/jackc/pgx/v5"
 )
+
+type AssetRequest struct {
+	Symbol    string `json:"symbol"`
+	Timeframe string `json:"timeframe"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	Operation string `json:"operation"` // "create", "update", "delete"
+}
+
+// Formats dynamic table name, e.g., "SBER@MISX", "D" → "bars_sber_misx_d"
+func assetTableName(symbol, tfStr, name string) string {
+	s := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(symbol, "@", "_"), "-", "_"))
+	t := strings.ToLower(tfStr)
+	if n := strings.ToLower(name); n != "" {
+		return fmt.Sprintf("bars_%s_%s_%s", s, t, n)
+	}
+	return fmt.Sprintf("bars_%s_%s", s, t)
+}
 
 func (c *Client) GetAssets(ctx context.Context) ([]AssetFinam, error) {
 	ctxWithToken, err := c.WithAuthToken(ctx)
@@ -52,14 +71,14 @@ func FinamAssetsTable(operation string, token string) ([]AssetFinamPG, int, erro
 	defer tx.Rollback(ctx)
 
 	assetsFromFinam, err := client.GetAssets(ctx)
-    seen := make(map[string]struct{})
-    for _, s := range assetsFromFinam {
-        if _, exists := seen[s.Symbol]; exists {
-            slog.Warn("Duplicate symbol in input", "symbol", s.Symbol)
-        }
-        seen[s.Symbol] = struct{}{}
-    }
-    
+	seen := make(map[string]struct{})
+	for _, s := range assetsFromFinam {
+		if _, exists := seen[s.Symbol]; exists {
+			slog.Warn("Duplicate symbol in input", "symbol", s.Symbol)
+		}
+		seen[s.Symbol] = struct{}{}
+	}
+
 	if err != nil {
 		slog.Error("Client.GetAssets", "err", err.Error())
 		return nil, 0, err
@@ -110,13 +129,13 @@ func FinamAssetsTable(operation string, token string) ([]AssetFinamPG, int, erro
 		defer rows.Close()
 
 		existingIDs := make(map[string]struct{})
-        for rows.Next() {
-            var id string
-            if err := rows.Scan(&id); err != nil {
-                return nil, 0, fmt.Errorf("scan finam_id: %w", err)
-            }
-            existingIDs[id] = struct{}{}
-        }
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				return nil, 0, fmt.Errorf("scan finam_id: %w", err)
+			}
+			existingIDs[id] = struct{}{}
+		}
 
 		// Filter new assets
 		var newAssets []AssetFinam
@@ -160,8 +179,8 @@ func FinamAssetsTable(operation string, token string) ([]AssetFinamPG, int, erro
 			return nil, 0, err
 		}
 		if err := tx.Commit(ctx); err != nil {
-            return nil, 0, fmt.Errorf("commit failed: %w", err)
-        }
+			return nil, 0, fmt.Errorf("commit failed: %w", err)
+		}
 		return nil, deletedCount, nil
 
 	default:
@@ -179,7 +198,7 @@ func insertAssets(ctx context.Context, tx pgx.Tx, securities []AssetFinam) ([]As
 
 	var inserted []AssetFinamPG
 	count := 0
-    skipped := 0
+	skipped := 0
 	for _, s := range securities {
 		var row AssetFinamPG
 		err := tx.QueryRow(ctx, insertQuery, s.Ticker, s.Symbol, s.Name, s.Mic, s.Type, s.ID).
@@ -189,7 +208,7 @@ func insertAssets(ctx context.Context, tx pgx.Tx, securities []AssetFinam) ([]As
 			if strings.Contains(err.Error(), "no rows in result set") {
 				slog.Debug("Skipped insert due to conflict", "symbol", s.Symbol)
 				skipped++
-                continue
+				continue
 			}
 			slog.Warn("Insert failed", "symbol", s.Symbol, "err", err)
 			continue
@@ -331,6 +350,192 @@ func DeleteAllFinamAssetsAndDrop(ctx context.Context, tx pgx.Tx) (int, error) {
 	slog.Info("Dropped finam_assets and cascaded tables")
 
 	return deletedCount, nil
+}
+
+func SingleAssetTable(jsonData []byte, token string) error {
+	var req AssetRequest
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	ctx := context.Background()
+	client, err := NewClient(ctx, token)
+	if err != nil {
+		slog.Error("NewClient", "err", err.Error())
+		return err
+	}
+	defer client.Close(ctx)
+
+	switch strings.ToLower(req.Operation) {
+	case "delete":
+		return deleteFinamAsset(ctx, client.connPG, req)
+	default:
+		if strings.ToLower(req.Operation) == "update" {
+			_, numb, err := FinamAssetsTable("update", token)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Update available finam_asssets: %v", numb)
+		}
+		if err := createAssetTable(ctx, client.connPG, req.Symbol, req.Timeframe); err != nil {
+			return err
+		}
+
+	}
+
+	bars, _, err := BarsFromFinam(ctx, client, req.Symbol, req.Timeframe, req.StartDate, req.EndDate)
+	if err != nil {
+		slog.Error("BarsFromFinam", "err", err)
+		return err
+	}
+
+	for _, bar := range bars {
+		barPgUpdate, err := ConvertBarDecimalToBarPG(bar)
+		if err != nil {
+			return err
+		}
+		if err := InsertInAssetTable(ctx, client.connPG, barPgUpdate, req); err != nil {
+			return fmt.Errorf("insert data failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func createAssetTable(ctx context.Context, conn *pgx.Conn, symbol, tfStr string) error {
+	table := assetTableName(symbol, tfStr, "")
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var assetID int
+	err = tx.QueryRow(ctx, `SELECT id FROM finam_assets WHERE symbol = $1`, symbol).Scan(&assetID)
+	if err != nil {
+		return fmt.Errorf("get asset_id: %w", err)
+	}
+
+	var timeframeID int
+	err = tx.QueryRow(ctx, `SELECT id FROM timeframes WHERE code = $1`, tfStr).Scan(&timeframeID)
+	if err != nil {
+		return fmt.Errorf("get timeframe_id: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO asset_tables (asset_id, timeframe_id, table_name)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (asset_id, timeframe_id)
+		DO UPDATE SET updated_at = now();`, assetID, timeframeID, table)
+
+	if err != nil {
+		return fmt.Errorf("insert asset_tables: %w", err)
+	}
+
+	createSQL := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			id SERIAL PRIMARY KEY,
+			asset_id INT NOT NULL REFERENCES finam_assets(id) ON DELETE CASCADE,
+			timeframe_id INT NOT NULL REFERENCES timeframes(id),
+			timestamp TIMESTAMPTZ NOT NULL,
+			open DOUBLE PRECISION,
+			high DOUBLE PRECISION,
+			low DOUBLE PRECISION,
+			close DOUBLE PRECISION,
+			volume BIGINT,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			updated_at TIMESTAMPTZ DEFAULT now(),
+			UNIQUE (asset_id, timeframe_id, timestamp)
+		);`, table)
+
+	if _, err := tx.Exec(ctx, createSQL); err != nil {
+		return fmt.Errorf("create table %s: %w", table, err)
+	}
+	fmt.Printf("Created table: %s\n", table)
+	return tx.Commit(ctx)
+}
+
+func deleteFinamAsset(ctx context.Context, connPG *pgx.Conn, req AssetRequest) error {
+	tx, err := connPG.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var assetID int
+	err = tx.QueryRow(ctx, `SELECT id FROM finam_assets WHERE symbol = $1`, req.Symbol).Scan(&assetID)
+	if err != nil {
+		return fmt.Errorf("get asset_id: %w", err)
+	}
+
+	var timeframeID int
+	err = tx.QueryRow(ctx, `SELECT id FROM timeframes WHERE code = $1`, req.Timeframe).Scan(&timeframeID)
+	if err != nil {
+		return fmt.Errorf("get timeframe_id: %w", err)
+	}
+	var table string
+	err = tx.QueryRow(ctx, `
+		SELECT table_name FROM asset_tables
+		WHERE asset_id = $1 AND timeframe_id = $2`,
+		assetID, timeframeID).Scan(&table)
+	if err != nil {
+		return fmt.Errorf("get table_name: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s CASCADE`, table)); err != nil {
+		return fmt.Errorf("drop table %s: %w", table, err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM asset_tables
+		WHERE asset_id = $1 AND timeframe_id = $2`,
+		assetID, timeframeID); err != nil {
+		return fmt.Errorf("delete from asset_tables: %w", err)
+	}
+	fmt.Printf("Table %s was deleted!\n", table)
+
+	return tx.Commit(ctx)
+}
+
+func InsertInAssetTable(ctx context.Context, conn *pgx.Conn, arg BarPgUpdate, req AssetRequest) error {
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var assetID int
+	err = tx.QueryRow(ctx, `SELECT id FROM finam_assets WHERE symbol = $1`, req.Symbol).Scan(&assetID)
+	if err != nil {
+		return fmt.Errorf("get asset_id: %w", err)
+	}
+
+	var timeframeID int
+	err = tx.QueryRow(ctx, `SELECT id FROM timeframes WHERE code = $1`, req.Timeframe).Scan(&timeframeID)
+	if err != nil {
+		return fmt.Errorf("get timeframe_id: %w", err)
+	}
+
+	table := assetTableName(req.Symbol, req.Timeframe, "")
+	insertTableSQL := fmt.Sprintf(`
+		INSERT INTO %s (
+			asset_id, timeframe_id, timestamp,
+			open, high, low, close, volume
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (asset_id, timeframe_id, timestamp) DO NOTHING;
+	`, table)
+	_, err = tx.Exec(ctx, insertTableSQL,
+		assetID, timeframeID,
+		arg.Timestamp, arg.Open, arg.High, arg.Low, arg.Close, arg.Volume,
+	)
+	if err != nil {
+		return fmt.Errorf("insert table: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+	return nil
 }
 
 // func PrintSecurities(sec []Asset) {
